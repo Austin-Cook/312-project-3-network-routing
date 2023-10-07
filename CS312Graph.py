@@ -13,11 +13,12 @@ class CS312GraphEdge:
     def __str__( self ):
         return '(src={} dest={} length={})'.format(self.src,self.dest,self.length)
 
+
 class CS312GraphNode:
     def __init__( self, node_id, node_loc ):
         self.node_id   = node_id
         self.loc       = node_loc
-        self.neighbors = [] #node_neighbors
+        self.neighbors = [] # node_neighbors
 
     def addEdge( self, neighborNode, weight ):
         self.neighbors.append( CS312GraphEdge(self,neighborNode,weight) )
@@ -28,12 +29,12 @@ class CS312GraphNode:
 
 
 class CS312Graph:
-    def __init__( self, nodeList, edgeList ):
+    def __init__( self, nodeList, edgeList ): # nodeList is a list of locations
         self.nodes    = []
         for i in range(len(nodeList)):
             self.nodes.append( CS312GraphNode( i, nodeList[i] ) )
 
-        for i in range(len(nodeList)):
+        for i in range(len(nodeList)):  # edgeList is a list -> each index of edgeList corresponds to nodeList/self.nodes at the index
             neighbors = edgeList[i]
             for n in neighbors:
                 self.nodes[i].addEdge( self.nodes[n[0]], n[1] )
@@ -46,4 +47,3 @@ class CS312Graph:
 
     def getNodes( self ):
         return self.nodes
-
