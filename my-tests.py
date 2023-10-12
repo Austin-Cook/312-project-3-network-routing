@@ -13,8 +13,16 @@ def run_tests():
     # array_queue.decrease_weight(2, 100)
     # print(array_queue)
 
-    solver = NetworkRoutingSolver()
-    A = CS312GraphNode(0, )
+    # dist = [float('inf'), 2, float('inf'), float('inf'), 5]
+    dist = [0, 1, 2, 3, 4, 5, 6, 7]
+    heap_queue = HeapQueue.make_queue(dist)
+
+    print(heap_queue)
+    print("")
+
+    heap_queue.decrease_weight(0, 5.5)
+    print(heap_queue)
+    print("")
 
 
 

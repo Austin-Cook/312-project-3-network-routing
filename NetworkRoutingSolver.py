@@ -17,20 +17,19 @@ class NetworkRoutingSolver:
         # dist: [0, 1, 3, 4, 4, 6, 5, 6]
         self.dist = None
 
+        # the CS312Graph containing all nodes and edges
+        self.network = None
+
     def initializeNetwork(self, network):
         assert (type(network) == CS312Graph)
         self.network = network
 
     def getShortestPath(self, destIndex):
-        # self.dest = destIndex # TODO DELETEME
-
-        # TODO - probably don't need
-        # create dictionary for constant edge lookup { node: dictionary { edge_dest_node: edge }}
-
         # work backwards from last edge to first edge to get path
         path_edges = []
         total_length = 0
 
+        # navigate the pre-filled prev array to build a path to destIndex
         prev_index = destIndex
         while True:
             curr_index = prev_index
@@ -64,9 +63,10 @@ class NetworkRoutingSolver:
         return {'cost': total_length, 'path': path_edges}
 
     def computeShortestPaths(self, srcIndex, use_heap=False):
-        # self.source = srcIndex    # TODO Deleteme
         t1 = time.time()
-        self.dist, self.prev = _dijkstra(network=self.network, queue_type=ArrayQueue, src_index=srcIndex)
+        self.dist, self.prev = _dijkstra(network=self.network,
+                                         queue_type=(HeapQueue if use_heap else ArrayQueue),
+                                         src_index=srcIndex)
         t2 = time.time()
 
         return t2 - t1
@@ -84,7 +84,7 @@ def _dijkstra(network: CS312Graph, queue_type, src_index: int):
     # SETUP
 
     # get all nodes
-    nodes = network.getNodes() # DO NOT MODIFY
+    nodes = network.getNodes()  # DO NOT MODIFY
 
     # map nodes to their index for quick lookup
     node_to_index_map = {}
@@ -112,8 +112,6 @@ def _dijkstra(network: CS312Graph, queue_type, src_index: int):
         # for all edges (u, v) in E do    # just edges from the current node
         for edge in (nodes[u_index]).neighbors:
             v_index = node_to_index_map[edge.dest]
-
-            assert u_index == node_to_index_map[edge.src]   # TODO Deleteme
 
             # if dist(v) > dist(u) + l(u, v) then
             alt_path_dist = dist[u_index] + edge.length
@@ -180,86 +178,98 @@ class QueueInterface(ABC):
 class ArrayQueue(QueueInterface):
     # just implement it as a map
 
-    def __init__(self, index_to_weight_map: dict):
+    def __init__(self, id_to_weight_map: dict):
         """
         Do not call directly; call make_queue() instead.
 
-        :param index_to_weight_map: The initial map of 0 based index id mapped to their distances
+        :param id_to_weight_map: The initial map of 0 based index id mapped to their distances
         """
-        self.index_to_weight_map = index_to_weight_map
+        self.id_to_weight_map = id_to_weight_map
 
     def __str__(self):
-        return str(self.index_to_weight_map)
+        return str(self.id_to_weight_map)
 
     @staticmethod
     def make_queue(weights: list):
-        index_to_weight_map = {}
+        id_to_weight_map = {}
 
         # fill the map with node_id (it's index) -> weight
         for node_index in range(len(weights)):
-            index_to_weight_map[node_index] = weights[node_index]
+            id_to_weight_map[node_index] = weights[node_index]
 
-        return ArrayQueue(index_to_weight_map)
+        return ArrayQueue(id_to_weight_map)
 
     def insert(self, node_id: int, weight: float):
         # item should not already be in the map
-        assert(self.index_to_weight_map.get(node_id) is None)
+        assert(self.id_to_weight_map.get(node_id) is None)
 
-        self.index_to_weight_map[node_id] = weight
+        self.id_to_weight_map[node_id] = weight
 
     def delete_min(self):
         min_id = None
         min_weight = float('inf')
 
         # find the node with the min weight
-        for node_id in self.index_to_weight_map:
-            if self.index_to_weight_map[node_id] <= min_weight:
+        for node_id in self.id_to_weight_map:
+            if self.id_to_weight_map[node_id] <= min_weight:
                 # found the new lowest item
                 min_id = node_id
-                min_weight = self.index_to_weight_map[node_id]
+                min_weight = self.id_to_weight_map[node_id]
 
         # remove the node with the min weight
         if min_id is not None:
-            self.index_to_weight_map.pop(min_id)
+            self.id_to_weight_map.pop(min_id)
 
         return min_id
 
     def decrease_weight(self, node_id: int, new_weight):
         # item should already be in the map
-        assert(self.index_to_weight_map.get(node_id) is not None)
+        assert(self.id_to_weight_map.get(node_id) is not None)
 
         # decrease the weight of the node
-        self.index_to_weight_map[node_id] = new_weight
+        self.id_to_weight_map[node_id] = new_weight
 
 
 class HeapQueue(QueueInterface):
 
-    def __init__(self, heap_array: list, index_to_weight_map: dict):
+    def __init__(self, heap_array: list, id_to_weight_map: dict, id_to_index_map: dict):
         """
         Do not call directly; call make_queue() instead.
 
-        :param index_to_weight_map: The initial map of 0 based index id mapped to their distances
+        :param id_to_weight_map: The initial map of 0 based id's mapped to their distances
+        :param id_to_index_map: The initial map of 0 based id's mapped to their weights
         """
+        # each index contains the id (the initial 0 based index)
         self.heap_array = heap_array
-        self.index_to_weight_map = index_to_weight_map
+        # id (initial index): weight
+        self.id_to_weight_map = id_to_weight_map
+        # id (initial index): curr_index
+        self.id_to_index_map = id_to_index_map
 
     def __str__(self):
-        pass
-        # TODO
+        return ("heap_array: " + str(self.heap_array) +
+                "\nid_to_weight_map: " + str(self.id_to_weight_map) +
+                "\nid_to_index_map: " + str(self.id_to_index_map))
 
     @staticmethod
     def make_queue(weights: list):
-        # create the array to represent a heap
-        heap_array = weights.copy()                                         # ]- O(n)
+        # create the array to represent a heap (each index contains the id/initial index in the array)
+        heap_array = [i for i in range(len(weights))]                      # ]- O(n)
 
-        # fill the map with node_id (it's initial index) -> weight
-        index_to_weight_map = {}
-        # TODO add
+        # id (initial index): weight
+        id_to_weight_map = {}
+        # id (initial index): curr_index
+        id_to_index_map = {}
+
+        # initialize the maps
         for node_index in range(len(weights)):
-            index_to_weight_map[node_index] = weights[node_index]
+            # initializes as id (initial index): initial weight
+            id_to_weight_map[node_index] = weights[node_index]
+            # initialized as index: index (the value will change as the heap is altered)
+            id_to_index_map[node_index] = node_index
 
         # create a heap queue with the array and map
-        heap_queue = HeapQueue(heap_array, index_to_weight_map)
+        heap_queue = HeapQueue(heap_array, id_to_weight_map, id_to_index_map)
 
         # reorder the heap_array as a min heap
         heap_queue._build_min_heap()                                        # ]- O(n)
@@ -267,58 +277,151 @@ class HeapQueue(QueueInterface):
         return heap_queue
 
     def insert(self, node_id: int, weight: float):
-        # append the item to the heap_array
+        insert_index = len(self.heap_array) # end of the array
+
+        # make room for one more node
+        self.heap_array.append(None)
+
+        # place the item at the end of the heap_array and set the mappings to weight and index
+        self._set(insert_index, node_id, weight)
+
         # percolate up starting at the index of the item just added (last index)
-        pass
+        self._percolate_up(insert_index)
 
     def delete_min(self):
+        if len(self.heap_array) < 1:
+            # heap already empty
+            return None
+
+        last_item_index = len(self.heap_array) - 1
+        old_min_id = self.heap_array[0]
+
         # set the value of the first item (index 0) to the value of the item at the last index
-        # delete the last item in the array
+        last_item_id = self.heap_array[last_item_index]
+        last_item_weight = self.id_to_weight_map[last_item_id]
+        self._set(0, last_item_id, last_item_weight)
+
+        # clear map entries for the old first item
+        self.id_to_weight_map.pop(old_min_id)     # ]- O(1)
+        self.id_to_index_map.pop(old_min_id)      # ]- O(1)
+
+        # remove last item from heap
+        self.heap_array.pop()                       # ]- O(1)
+
         # percolate down from the first item (index 0)
-        pass
+        if len(self.heap_array) > 0:
+            self._percolate_down(0)
+
+        return old_min_id
 
     def decrease_weight(self, node_id: int, new_weight):
         # get the node's old_weight from the dictionary
+        old_weight = self.id_to_weight_map[node_id]
+        index = self.id_to_index_map[node_id]
+
         # update the node's weight in the dictionary
-        # if new_weight < old_weight
-        #   percolate up from node_id
-        # else if new_weight > old_weight
-        #   percolate down at old_weight
-        pass
+        self.id_to_weight_map[node_id] = new_weight
+
+        if new_weight < old_weight:
+            # percolate up from current index of node_id
+            self._percolate_up(index)
+        elif new_weight > old_weight:
+            # percolate down from current index of node_id
+            self._percolate_down(index)
 
     # HEAP METHODS
 
+    def _set(self, index_to_set: int, node_id: int, weight: float):
+        # places a node in the heap at the specified index, and updates the mappings to weight and index
+
+        # sets the heap value at index_to_set to the node_id
+        self.heap_array[index_to_set] = node_id
+
+        # update id_to_weight_map with the new weight
+        self.id_to_weight_map[node_id] = weight
+
+        # update id_to_index_map with the new index
+        self.id_to_index_map[node_id] = index_to_set
+
+    def _swap(self, index_i: int, index_j: int):
+        # swaps the values in self.heap_array at indexes i and j and updates the id mapping to weight and index
+
+        # get previous i values
+        old_index_i_id = self.heap_array[index_i]
+        old_index_i_weight = self.id_to_weight_map[old_index_i_id]
+
+        # get previous j values
+        old_index_j_id = self.heap_array[index_j]
+        old_index_j_weight = self.id_to_weight_map[old_index_j_id]
+
+        # set i to old j values and update mappings for old_index_j_id
+        self._set(index_i, old_index_j_id, old_index_j_weight)
+
+        # set j to old i values and update mappings for old_index_i_id
+        self._set(index_j, old_index_i_id, old_index_i_weight)
+
     def _build_min_heap(self):
+        # order all subtrees such that the lowest weight is the parent
+
         # for each node with at least one child (from high to low)
         for curr_root_index in range((len(self.heap_array) // 2) - 1, -1, -1):
             # heapify the subtree
             self._percolate_down(curr_root_index)
 
     def _percolate_down(self, curr_index: int):
-        # get left child index
-        # get right child index
+        # get left and right child indexes and id's
+        left_child_index = self._get_left_child_index(curr_index)
+        right_child_index = self._get_right_child_index(curr_index)
 
         # set min_index to curr_index
-        # set min_val to value at curr_index
+        min_index = curr_index
+        curr_id = self.heap_array[curr_index]
+        # set min_weight to weight at curr_id
+        min_weight = self.id_to_weight_map[curr_id]
 
-        # if left_child_index is not None and value at left_child_index is less than min_val
-        #   set min_index to left_child_index
-        #   set min_val to value at left_child_index
-        # if right child index is not None and value at right_child_index is less than min_val
-        #   set min_index to right_child_index
-        #   set min_val to value at left_child_index
+        # get child with the lowest weight
+        if left_child_index is not None:
+            # left child exists
+            left_child_id = self.heap_array[left_child_index]
+            left_child_weight = self.id_to_weight_map[left_child_id]
+            if left_child_weight < min_weight:
+                # left_child has new lowest weight
+                min_index = left_child_index
+                min_weight = left_child_weight
 
-        # if min_index is not curr_index
-        #   swap values at curr_index and min_index
-        #   recursively call _percolate_down on the child's tree
-        pass
+        if right_child_index is not None:
+            # right child exists
+            right_child_id = self.heap_array[right_child_index]
+            right_child_weight = self.id_to_weight_map[right_child_id]
+            if right_child_weight < min_weight:
+                # right_child has new lowest weight
+                min_index = right_child_index
+
+        # swap the parent with the lower child
+        if min_index != curr_index:
+            # parent is not already the lowest
+
+            # swap the parent with the lowest child
+            self._swap(curr_index, min_index)
+
+            # recursively call _percolate_down on the child's tree
+            self._percolate_down(min_index)
 
     def _percolate_up(self, curr_index):
-        # if the parent index is greater than the curr_index
-        #   swap values at curr_index and parent_index
-        #   if get the parent index is not None (top of tree)
-        #       recursively call _percolate_up on the parent_index
-        pass
+        parent_index = self._get_parent_index(curr_index)
+
+        if parent_index is not None:
+            # parent exists
+            parent_id = self.heap_array[parent_index]
+            curr_id = self.heap_array[curr_index]
+            if self.id_to_weight_map[parent_id] > self.id_to_weight_map[curr_id]:
+                # parent weight > curr_weight
+
+                # swap the node with its parent
+                self._swap(curr_index, parent_index)
+
+                # recursively call _percolate_up on the parent_index
+                self._percolate_up(parent_index)
 
     def _get_left_child_index(self, index: int):
         # gets the index of the left child and returns None if it doesn't exist
@@ -328,7 +431,7 @@ class HeapQueue(QueueInterface):
 
     def _get_right_child_index(self, index: int):
         # gets the index of the right child and returns None if it doesn't exist
-        right_index = (index * 2) + 1
+        right_index = (index * 2) + 2
 
         return right_index if right_index < len(self.heap_array) else None
 
@@ -338,11 +441,3 @@ class HeapQueue(QueueInterface):
         parent_index = ceil(index / 2) - 1
 
         return parent_index if parent_index != -1 else None
-
-    def _swap(self, i: int, j: int):
-        # swaps the values in self.heap_array at indexes i and j
-        temp = self.heap_array[i]
-        self.heap_array[i] = j
-        self.heap_array[i] = temp
-
-        # TODO update the map of id->index
