@@ -72,7 +72,7 @@ class NetworkRoutingSolver:
         return t2 - t1
 
 
-def _dijkstra(network: CS312Graph, queue_type, src_index: int):
+def _dijkstra(network: CS312Graph, queue_type, src_index: int):     # ]- O(DEPENDS ON PRIORITY QUEUE)
     """
     Runs Dijkstra's algorithm to find the shortest path from the node with index
     srcIndex (0 based) in the network (CS312Graph object) to all other nodes
@@ -109,18 +109,20 @@ def _dijkstra(network: CS312Graph, queue_type, src_index: int):
 
     # while H is not empty do
     while (u_index := H.delete_min()) is not None:
-        # for all edges (u, v) in E do    # just edges from the current node
+        # for all edges (u, v) in E (just edges from the current node)
         for edge in (nodes[u_index]).neighbors:
             v_index = node_to_index_map[edge.dest]
 
-            # if dist(v) > dist(u) + l(u, v) then
+            # see if we can get to v faster through u
             alt_path_dist = dist[u_index] + edge.length
             if dist[v_index] > alt_path_dist:
-                # dist(v) <- dist(u) + l(u, v)
+                # we found a shorter path to v
+
+                # update its distance to the shorter one
                 dist[v_index] = alt_path_dist
-                # prev(v) <- u
+                # the prev for v is now u
                 prev[v_index] = u_index
-                # H.decreasekey(v)
+                # lower its weight in the queue
                 H.decrease_weight(v_index, alt_path_dist)
 
     return dist, prev
@@ -176,7 +178,7 @@ class QueueInterface(ABC):
 
 
 class ArrayQueue(QueueInterface):
-    # just implement it as a map
+    # NOTE - I just implemented this as a map, rather than an array
 
     def __init__(self, id_to_weight_map: dict):
         """
@@ -190,7 +192,7 @@ class ArrayQueue(QueueInterface):
         return str(self.id_to_weight_map)
 
     @staticmethod
-    def make_queue(weights: list):
+    def make_queue(weights: list):                                      # ]- O(n)
         id_to_weight_map = {}
 
         # fill the map with node_id (it's index) -> weight
@@ -199,13 +201,13 @@ class ArrayQueue(QueueInterface):
 
         return ArrayQueue(id_to_weight_map)
 
-    def insert(self, node_id: int, weight: float):
+    def insert(self, node_id: int, weight: float):                      # ]- O(1)
         # item should not already be in the map
         assert(self.id_to_weight_map.get(node_id) is None)
 
         self.id_to_weight_map[node_id] = weight
 
-    def delete_min(self):
+    def delete_min(self):                                               # ]- O(n)
         min_id = None
         min_weight = float('inf')
 
@@ -222,7 +224,7 @@ class ArrayQueue(QueueInterface):
 
         return min_id
 
-    def decrease_weight(self, node_id: int, new_weight):
+    def decrease_weight(self, node_id: int, new_weight):                    # ]- O(1)
         # item should already be in the map
         assert(self.id_to_weight_map.get(node_id) is not None)
 
@@ -252,7 +254,7 @@ class HeapQueue(QueueInterface):
                 "\nid_to_index_map: " + str(self.id_to_index_map))
 
     @staticmethod
-    def make_queue(weights: list):
+    def make_queue(weights: list):                                         # ]- O(n)
         # create the array to represent a heap (each index contains the id/initial index in the array)
         heap_array = [i for i in range(len(weights))]                      # ]- O(n)
 
@@ -276,7 +278,7 @@ class HeapQueue(QueueInterface):
 
         return heap_queue
 
-    def insert(self, node_id: int, weight: float):
+    def insert(self, node_id: int, weight: float):                          # ]- O(logn)
         insert_index = len(self.heap_array) # end of the array
 
         # make room for one more node
@@ -288,7 +290,7 @@ class HeapQueue(QueueInterface):
         # percolate up starting at the index of the item just added (last index)
         self._percolate_up(insert_index)
 
-    def delete_min(self):
+    def delete_min(self):                                                    # ]- O(logn)
         if len(self.heap_array) < 1:
             # heap already empty
             return None
@@ -314,7 +316,7 @@ class HeapQueue(QueueInterface):
 
         return old_min_id
 
-    def decrease_weight(self, node_id: int, new_weight):
+    def decrease_weight(self, node_id: int, new_weight):                         # ]- O(logn)
         # get the node's old_weight from the dictionary
         old_weight = self.id_to_weight_map[node_id]
         index = self.id_to_index_map[node_id]
@@ -331,7 +333,7 @@ class HeapQueue(QueueInterface):
 
     # HEAP METHODS
 
-    def _set(self, index_to_set: int, node_id: int, weight: float):
+    def _set(self, index_to_set: int, node_id: int, weight: float):             # ]- O(1)
         # places a node in the heap at the specified index, and updates the mappings to weight and index
 
         # sets the heap value at index_to_set to the node_id
@@ -343,7 +345,7 @@ class HeapQueue(QueueInterface):
         # update id_to_index_map with the new index
         self.id_to_index_map[node_id] = index_to_set
 
-    def _swap(self, index_i: int, index_j: int):
+    def _swap(self, index_i: int, index_j: int):                              # ]- O(1)
         # swaps the values in self.heap_array at indexes i and j and updates the id mapping to weight and index
 
         # get previous i values
@@ -360,7 +362,7 @@ class HeapQueue(QueueInterface):
         # set j to old i values and update mappings for old_index_i_id
         self._set(index_j, old_index_i_id, old_index_i_weight)
 
-    def _build_min_heap(self):
+    def _build_min_heap(self):                                                 # ]- O(n)
         # order all subtrees such that the lowest weight is the parent
 
         # for each node with at least one child (from high to low)
@@ -368,7 +370,7 @@ class HeapQueue(QueueInterface):
             # heapify the subtree
             self._percolate_down(curr_root_index)
 
-    def _percolate_down(self, curr_index: int):
+    def _percolate_down(self, curr_index: int):                                # ]- O(logn)
         # get left and right child indexes and id's
         left_child_index = self._get_left_child_index(curr_index)
         right_child_index = self._get_right_child_index(curr_index)
@@ -407,7 +409,7 @@ class HeapQueue(QueueInterface):
             # recursively call _percolate_down on the child's tree
             self._percolate_down(min_index)
 
-    def _percolate_up(self, curr_index):
+    def _percolate_up(self, curr_index: int):                                 # ]- O(logn)
         parent_index = self._get_parent_index(curr_index)
 
         if parent_index is not None:
@@ -423,20 +425,20 @@ class HeapQueue(QueueInterface):
                 # recursively call _percolate_up on the parent_index
                 self._percolate_up(parent_index)
 
-    def _get_left_child_index(self, index: int):
+    def _get_left_child_index(self, index: int):                                   # ]- O(1)
         # gets the index of the left child and returns None if it doesn't exist
         left_index = (index * 2) + 1
 
         return left_index if left_index < len(self.heap_array) else None
 
-    def _get_right_child_index(self, index: int):
+    def _get_right_child_index(self, index: int):                                  # ]- O(1)
         # gets the index of the right child and returns None if it doesn't exist
         right_index = (index * 2) + 2
 
         return right_index if right_index < len(self.heap_array) else None
 
     @staticmethod
-    def _get_parent_index(index: int):
+    def _get_parent_index(index: int):                                              # ]- O(1)
         # gets the index of the parent and returns None if already at top of tree
         parent_index = ceil(index / 2) - 1
 
